@@ -48,6 +48,8 @@ async def post_chat_message(request: ChatMessageRequest, req: Request) -> ChatMe
     Raises:
         HTTPException: On validation error (422), agent unavailable (503), or server error (500)
     """
+    message_id = None
+    
     try:
         # Generate unique message ID for tracking across system
         message_id = f"msg_{uuid.uuid4().hex[:12]}"
@@ -127,7 +129,11 @@ async def post_chat_message(request: ChatMessageRequest, req: Request) -> ChatMe
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=error_message
         )
-
+    
+    except HTTPException:
+        """Re-raise HTTPException to preserve status codes (503, 422, etc)."""
+        raise
+    
     except Exception as unexpected_error:
         """Catch unexpected errors and return 500 without exposing internals."""
         error_message = f"Unexpected error in post_chat_message: {str(unexpected_error)}"

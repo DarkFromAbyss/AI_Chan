@@ -66,10 +66,10 @@ class SenseiAgent:
         if not api_key:
             # Xác định đường dẫn tuyệt đối đến file .env
             # Cách 1: Nếu .env ở thư mục gốc của dự án:
-            env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+            # env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
             
             # Cách 2: Nếu .env nằm cùng thư mục với llm_service.py (trong thư mục llm_core)
-            # env_path = os.path.join(os.path.dirname(__file__), '.env')
+            env_path = os.path.join(os.path.dirname(__file__), '.env')
             
             # Khuyên dùng: Để .env ở thư mục gốc dự án
             
@@ -85,7 +85,7 @@ class SenseiAgent:
             
         
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash-lite",
+            model="gemini-2.5-flash",
             api_key=api_key,
             temperature=0.7
         )
@@ -256,6 +256,11 @@ class SenseiAgent:
             if not final_response_text:
                 logger.warning("No response generated from agent")
                 return self._error_response(session_id, "Unable to generate response")
+            
+            if type(final_response_text) != str:
+                logger.warning("Unexpected response type: %s", type(final_response_text))
+                final_response_text = str(final_response_text)
+                
             
             # Step 3: Extract display portion
             display_text, voice_text = extract_dual_track(final_response_text)

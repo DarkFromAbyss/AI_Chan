@@ -4,28 +4,25 @@ This module initializes the FastAPI application, configures middleware
 (CORS, logging), registers routes, and sets up exception handlers.
 """
 
+import sys
+from pathlib import Path
+from contextlib import asynccontextmanager
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from contextlib import asynccontextmanager
-import sys
-import os
 
 from core.config import settings
 from core.logger import get_logger
 from routers import chat
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Lấy đường dẫn của thư mục cha (thư mục root dự án)
-parent_dir = os.path.dirname(current_dir)
-
-# Thêm thư mục root vào sys.path để Python có thể tìm thấy llm_core
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
-    
 # Initialize logger for main module
 logger = get_logger(__name__)
+
+# Load environment variables early to ensure GOOGLE_API_KEY and other secrets are available
+load_dotenv()
+logger.debug("Environment variables loaded from .env file")
 
 
 @asynccontextmanager
@@ -43,24 +40,72 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
     logger.info(f"CORS enabled for origins: {settings.cors_origins}")
     
+    # Add project root to sys.path for llm_core imports
+    backend_dir = Path(__file__).parent
+    project_root = backend_dir.parent
+    
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+        logger.debug(f"Added project root to sys.path: {project_root}")
+    
     # Initialize SenseiAgent for chat processing
     try:
-        from llm_core import SenseiAgent
+        from llm_core.llm_service import SenseiAgent
         
-        # Determine config path (relative to backend directory)
-        backend_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(backend_dir, "..", "config.yaml")
+        # Determine config path (relative to project root)
+        config_path = project_root / "config.yaml"
+        
+        if not config_path.exists():
+            raise FileNotFoundError(
+                f"Configuration file not found at {config_path}. "
+                f"Ensure config.yaml exists in the project root directory."
+            )
         
         logger.info(f"Initializing SenseiAgent with config: {config_path}")
-        agent = SenseiAgent(config_path=config_path)
+        agent = SenseiAgent(config_path=str(config_path))
         
         # Store agent in app state for route handlers to access
         app.state.sensei_agent = agent
         logger.info("SenseiAgent initialized successfully and ready for chat processing")
         
-    except Exception as e:
-        logger.error(f"Failed to initialize SenseiAgent: {e}", exc_info=True)
-        logger.warning("Chat endpoint will be unavailable. Ensure GOOGLE_API_KEY is set and config.yaml exists.")
+    except FileNotFoundError as file_error:
+        logger.error(f"Configuration file error: {file_error}")
+        logger.warning(
+            "Chat endpoint will be unavailable. "
+            "Ensure config.yaml exists at the project root."
+        )
+        app.state.sensei_agent = None
+        
+    except ImportError as import_error:
+        logger.error(
+            f"Failed to import SenseiAgent from llm_core: {import_error}",
+            exc_info=True
+        )
+        logger.warning(
+            "Chat endpoint will be unavailable. "
+            "Ensure llm_core package is properly installed."
+        )
+        app.state.sensei_agent = None
+        
+    except ValueError as value_error:
+        logger.error(
+            f"SenseiAgent initialization failed due to invalid configuration: {value_error}",
+            exc_info=True
+        )
+        logger.warning(
+            "Chat endpoint will be unavailable. "
+            "Ensure GOOGLE_API_KEY is set and config.yaml is valid."
+        )
+        app.state.sensei_agent = None
+        
+    except Exception as unexpected_error:
+        logger.error(
+            f"Unexpected error during SenseiAgent initialization: {unexpected_error}",
+            exc_info=True
+        )
+        logger.warning(
+            "Chat endpoint will be unavailable. Check GOOGLE_API_KEY, config.yaml, and dependencies."
+        )
         app.state.sensei_agent = None
     
     yield

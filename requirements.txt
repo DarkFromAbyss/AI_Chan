@@ -17,7 +17,7 @@ langchain-core
 langchain-chroma
 langchain-classic
 langchain-community
-langchain-genai
+langchain-google-genai
 langchain-huggingface
 langchain-text-splitters
 
@@ -41,9 +41,8 @@ python-multipart
 python-dotenv
 pytest 
 
-semer
-soxr 
+
 jaconv
-pyopenjtalk
+# pyopenjtalk
 pandas
 numpy

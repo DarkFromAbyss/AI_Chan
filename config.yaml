@@ -1,4 +1,5 @@
-data_directory: C:\Users\PC\Desktop\AI_NAGARI-Artificial_Intelligence_Nihongo_Agentic_RAG_Inference\data
+data_directory: C:\Users\ADMIN\Desktop\AI_NAGARI-Artificial_Intelligence_Nihongo_Agentic_RAG_Inference\data
 models:
-  Qwen2.5-7B-Instruct: C:\Users\PC\Desktop\AI_NAGARI-Artificial_Intelligence_Nihongo_Agentic_RAG_Inference\models\Qwen2.5-7B-Instruct
-  all-MiniLM-L6-v2: C:\Users\PC\Desktop\AI_NAGARI-Artificial_Intelligence_Nihongo_Agentic_RAG_Inference\models\all-MiniLM-L6-v2
+  Qwen2.5-7B-Instruct: C:\Users\ADMIN\Desktop\AI_NAGARI-Artificial_Intelligence_Nihongo_Agentic_RAG_Inference\models\Qwen2.5-7B-Instruct
+  all-MiniLM-L6-v2: C:\Users\ADMIN\Desktop\AI_NAGARI-Artificial_Intelligence_Nihongo_Agentic_RAG_Inference\models\models--sentence-transformers--all-MiniLM-L6-v2
+  # sentence-transformers/all-MiniLM-L6-v2: C:\Users\ADMIN\Desktop\AI_NAGARI-Artificial_Intelligence_Nihongo_Agentic_RAG_Inference\models
