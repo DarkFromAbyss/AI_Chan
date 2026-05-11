@@ -33,7 +33,7 @@ export function VrmModel({ url, onError, onLoad }: VrmModelProps) {
           setVrm(vrmData);
 
           // Rotate the model to face the camera (VRM models face +Z by default)
-          vrmData.scene.rotation.y = Math.PI;
+          vrmData.scene.rotation.y = 0;
 
           // Create animation mixer for potential animations
           mixerRef.current = new THREE.AnimationMixer(vrmData.scene);

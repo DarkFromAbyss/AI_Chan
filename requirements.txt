@@ -17,6 +17,7 @@ langchain-core
 langchain-chroma
 langchain-classic
 langchain-community
+langchain-genai
 langchain-huggingface
 langchain-text-splitters
 
@@ -33,11 +34,16 @@ pydantic[email]
 python-multipart
 jwt
 
+openpyxl
 pydantic
 pydantic-settings
 python-multipart
 python-dotenv
 pytest 
 
+semer
+soxr 
+jaconv
+pyopenjtalk
 pandas
 numpy

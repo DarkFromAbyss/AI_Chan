@@ -102,7 +102,7 @@ export function ChatPanel({ className }: ChatPanelProps) {
 
       try {
         // Gọi API đến Backend thực tế
-        const response = await fetch("http://localhost:8000/api/chat", {
+        const response = await fetch("http://127.0.0.1:8000/api/chat", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -129,6 +129,7 @@ export function ChatPanel({ className }: ChatPanelProps) {
           // Lưu ý: Hiện tại backend của bạn chỉ trả về status chứ chưa trả về câu trả lời thực sự của AI (LLM). 
           // Khi bạn ráp LLM vào backend, bạn sẽ thay data.message thành trường chứa câu trả lời của AI.
         };
+        
         
         setMessages((prev) => [...prev, aiResponse]);
 

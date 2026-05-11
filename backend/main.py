@@ -8,11 +8,22 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
+import sys
+import os
 
 from core.config import settings
 from core.logger import get_logger
 from routers import chat
 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Lấy đường dẫn của thư mục cha (thư mục root dự án)
+parent_dir = os.path.dirname(current_dir)
+
+# Thêm thư mục root vào sys.path để Python có thể tìm thấy llm_core
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+    
 # Initialize logger for main module
 logger = get_logger(__name__)
 
@@ -21,16 +32,44 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     """
     Lifespan context manager for startup and shutdown events.
+    
+    Initializes the llm_core.SenseiAgent at application startup
+    and stores it in app.state for access by route handlers.
 
     Args:
         app: FastAPI application instance
     """
-    # Startup
+    # ========== STARTUP ==========
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
     logger.info(f"CORS enabled for origins: {settings.cors_origins}")
+    
+    # Initialize SenseiAgent for chat processing
+    try:
+        from llm_core import SenseiAgent
+        
+        # Determine config path (relative to backend directory)
+        backend_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(backend_dir, "..", "config.yaml")
+        
+        logger.info(f"Initializing SenseiAgent with config: {config_path}")
+        agent = SenseiAgent(config_path=config_path)
+        
+        # Store agent in app state for route handlers to access
+        app.state.sensei_agent = agent
+        logger.info("SenseiAgent initialized successfully and ready for chat processing")
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize SenseiAgent: {e}", exc_info=True)
+        logger.warning("Chat endpoint will be unavailable. Ensure GOOGLE_API_KEY is set and config.yaml exists.")
+        app.state.sensei_agent = None
+    
     yield
-    # Shutdown
+    
+    # ========== SHUTDOWN ==========
     logger.info(f"Shutting down {settings.app_name}")
+    # Clean up any resources if needed
+    if hasattr(app.state, "sensei_agent") and app.state.sensei_agent:
+        logger.info("SenseiAgent resources cleaned up")
 
 
 def create_app() -> FastAPI:
