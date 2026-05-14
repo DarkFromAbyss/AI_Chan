@@ -85,6 +85,8 @@ def extract_dual_track(response_text: str) -> Tuple[str, str]:
     # Extract <voice> content
     voice_match = re.search(r"<voice>(.*?)</voice>", response_text, re.DOTALL)
     voice_text = voice_match.group(1).strip() if voice_match else ""
+    
+    
 
     logger.debug("Extracted display: %d chars, voice: %d chars", 
                  len(display_text), len(voice_text))

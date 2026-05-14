@@ -38,15 +38,60 @@ class SystemPromptManager:
     def get_system_prompt(self, 
                           display_lang: str = "en", 
                           recent_time: str = "") -> str:
-        """Assemble complete system prompt with language settings.
+        """Assemble complete system prompt with language settings and TTS instructions.
         
         Args:
             display_lang: Output language ("en", "vi", or "ja")
             recent_time: Current time for temporal awareness
         
         Returns:
-            Complete system prompt string
+            Complete system prompt string with dual-track XML output enforcer
         """
+        xml_output_enforcer = """[MANDATORY OUTPUT FORMAT - DUAL TRACK XML]
+
+You MUST output responses ONLY using these EXACT FOUR independent XML tags. 
+CRITICAL: DO NOT nest tags inside each other. They MUST be top-level siblings.
+
+<html>
+  [Detailed academic content with HTML5 tags: <p>, <ul>, <li>, <b>, <i>, <br>, etc.]
+  [Use this section for explanations, examples, structured data in {display_lang}]
+</html>
+
+<display>
+  [Short, conversational text in {display_lang} summarizing the response]
+  [NO technical jargon, only natural language]
+  [Max 150 characters]
+</display>
+
+<voice>
+  [Pure Japanese text for TTS synthesis]
+  [Use Hiragana/Katakana for difficult Kanji to ensure clarity]
+  [Include natural Japanese rhythm and punctuation: 、。！？]
+  [This section MUST be natural-sounding Japanese, not robotic]
+  [Max 300 characters]
+</voice>
+
+<intent>
+  [ONLY "other" or "search" - MUST be in English]
+  [Use "search" if user is asking for knowledge/information]
+  [Use "other" for casual conversation, greetings, etc.]
+</intent>
+
+CRITICAL RULES:
+1. Always use ALL FOUR tags exactly as formatted above.
+2. No markdown, no code blocks, no extra text outside these tags.
+3. Tags must be INDEPENDENT (e.g., <voice> must NOT be inside <html>).
+4. <voice> MUST be natural, fluent Japanese ONLY (never mix languages).
+5. <display> must be in the language specified: {display_lang}.
+
+[SYSTEM SETTINGS]
+- Output language for <display>: "{display_lang}"
+- Current time for context: {recent_time}
+- TTS voice synthesis enabled: YES
+- Max reasoning steps: 3
+- Safety guardrails: Enabled
+"""
+        
         system_prompt = f"""
 {self.intro_content}
 
@@ -54,18 +99,8 @@ class SystemPromptManager:
 
 {self.rules_content}
 
-[SYSTEM SETTINGS]
-- Output language (display_lang) for this session: "{display_lang}"
-- If display_lang="en": Write <display> section in English
-- If display_lang="vi": Write <display> section in Vietnamese
-- If display_lang="ja": Write <display> section in Japanese
-- If recent_time {recent_time} is provided: Include it in the system prompt for temporal awareness
-- <voice> tag MUST ALWAYS be in Japanese (にほんご)
-- Max reasoning steps: 3
-- Safety guardrails: Enabled
+{xml_output_enforcer}
 """
-        if recent_time:
-            system_prompt = system_prompt.replace("{recent_time}", recent_time)
         return system_prompt.strip()
 
     def get_prompt_stats(self) -> Dict[str, int]:

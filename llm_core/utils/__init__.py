@@ -9,6 +9,7 @@ from .data_loaders import (
     load_faiss_index,
     load_markdown_file,
 )
+from .tag_extractor import TagExtractor, ExtractedTags
 
 __all__ = [
     "get_logger",
@@ -21,4 +22,6 @@ __all__ = [
     "load_grammar_csv",
     "load_faiss_index",
     "load_markdown_file",
+    "TagExtractor",
+    "ExtractedTags",
 ]

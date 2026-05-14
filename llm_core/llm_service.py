@@ -20,6 +20,7 @@ from llm_core.semantic_cache import SenseiSemanticCache
 from llm_core.utils.logger import get_logger
 from llm_core.utils.config_manager import load_config, get_model_path, get_data_directory
 from llm_core.utils.text_normalizer import extract_dual_track
+from llm_core.utils.tag_extractor import TagExtractor
 from llm_core.agents.state_definitions import AgentState
 from llm_core.agents.tool_handlers import search_vocabulary, search_grammar, search_grammar_doc
 from llm_core.prompts.system_prompts import SystemPromptManager
@@ -210,12 +211,17 @@ class SenseiAgent:
                 if cache_results and cache_results[0]["score"] > 0.75:
                     logger.info("Cache hit for session %s | similarity: %.2f",
                               session_id, cache_results[0]["score"])
-                    cached_response = cache_results[0]["response"]
-                    display_text, _ = extract_dual_track(cached_response)
                     
+                    cached_response = cache_results[0]["response"]
+                    # Parse cached XML response properly
+                    extracted = TagExtractor.extract_tags(cached_response)
                     return ModelResponseSchema(
                         session_id=session_id,
-                        assistant_text=display_text,
+                        assistant_text=extracted.display,
+                        html_content=extracted.html,
+                        voice_text=extracted.voice,
+                        intent_classification=extracted.intent,
+                        raw_output=cached_response,
                         sources=["cached_response"],
                         metadata={
                             "cache_hit": True,
@@ -253,12 +259,17 @@ class SenseiAgent:
                 if latest_message.type == "ai" and latest_message.content:
                     final_response_text = latest_message.content
             
+            logger.info(f"""Agent execution completed | 
+                        Iterations: {iterations} | 
+                        Final response length: {len(final_response_text)} chars| 
+                        Content preview: {final_response_text}""")
+            
             if not final_response_text:
                 logger.warning("No response generated from agent")
                 return self._error_response(session_id, "Unable to generate response")
             
-            # Step 3: Extract display portion
-            display_text, voice_text = extract_dual_track(final_response_text)
+            # Step 3: Parse XML tags from response
+            extracted = TagExtractor.extract_tags(final_response_text)
             
             # Step 4: Cache the response
             if self.enable_cache:
@@ -276,17 +287,21 @@ class SenseiAgent:
                 "Response generated successfully | Session: %s | Latency: %dms",
                 session_id, latency_ms
             )
-            
-            # Step 5: Return formatted response
+                        
+            # Step 5: Return formatted response with all parsed fields
             return ModelResponseSchema(
                 session_id=session_id,
-                assistant_text=display_text,
+                assistant_text=extracted.display,
+                html_content=extracted.html,
+                voice_text=extracted.voice,
+                intent_classification=extracted.intent,
+                raw_output=final_response_text,
                 sources=["grammar_guide", "vocabulary_db"],
                 metadata={
                     "cache_hit": False,
                     "latency_ms": latency_ms,
                     "iterations": iterations,
-                    "has_voice": bool(voice_text)
+                    "extraction_success": extracted.extraction_success
                 }
             )
             
