@@ -33,6 +33,7 @@ python-jose[cryptography]
 pydantic[email]
 python-multipart
 jwt
+requests
 
 openpyxl
 pydantic
@@ -47,3 +48,4 @@ jaconv
 pyopenjtalk
 pandas
 numpy
+sounddevice
