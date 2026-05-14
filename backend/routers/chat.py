@@ -101,19 +101,28 @@ async def post_chat_message(request: ChatMessageRequest, req: Request) -> ChatMe
             f"Latency: {llm_output.metadata.get('latency_ms', 0)}ms"
         )
 
-        # ========== STEP 4: Extract display text (remove <voice> tags) ==========
-        response_text = llm_output.assistant_text
+        # ========== STEP 4: Use pre-parsed fields from ModelResponseSchema ==========
+        # All XML tags have been extracted in llm_service by TagExtractor
+        # No need for OutputFormatter here - data is already parsed and validated
         
-        # Parse dual-track format to extract display portion
-        display_match = re.search(r"<display>(.*?)</display>", response_text, re.DOTALL)
-        display_text = display_match.group(1).strip() if display_match else response_text
+        display_text = llm_output.assistant_text
+        voice_text = llm_output.voice_text
         
-        logger.debug(f"Extracted display text | Length: {len(display_text)} chars")
+        if not display_text:
+            logger.warning("Empty display text in agent response")
+            display_text = "Sorry, an error occurred processing your request."
+            voice_text = "エラーが発生しました。"
+        
+        logger.debug(
+            f"Using extracted response | Display: {len(display_text)} chars | "
+            f"Voice: {len(voice_text)} chars"
+        )
 
         # ========== STEP 5: Format as ChatMessageResponse ==========
         return ChatMessageResponse(
             status="success",
             message=display_text,  # Display text for UI
+            voice_text=voice_text,  # Japanese text for TTS synthesis
             message_id=message_id,
             timestamp=current_timestamp
         )

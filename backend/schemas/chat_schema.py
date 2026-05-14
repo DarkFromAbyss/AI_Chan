@@ -42,16 +42,18 @@ class ChatMessageRequest(BaseModel):
 
 
 class ChatMessageResponse(BaseModel):
-    """Response schema for chat message processing.
+    """Response schema for chat message processing with TTS support.
 
     Attributes:
         status: Status of the request ('success' or 'error')
-        message: Human-readable message
+        message: Display message for UI
+        voice_text: Japanese text for TTS synthesis
         message_id: Unique identifier for the processed message
         timestamp: When the message was processed
     """
     status: str = Field(..., description="Request status")
-    message: str = Field(..., description="Response message")
+    message: str = Field(..., description="Display message for UI")
+    voice_text: str = Field(default="", description="Japanese text for TTS synthesis")
     message_id: str = Field(..., description="Unique message identifier")
     timestamp: datetime = Field(..., description="Processing timestamp")
 
@@ -60,7 +62,8 @@ class ChatMessageResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "status": "success",
-                "message": "Message received and queued for processing",
+                "message": "Here is the explanation you requested...",
+                "voice_text": "あなたがリクエストした説明は次の通りです...",
                 "message_id": "msg_12345",
                 "timestamp": "2026-05-04T10:30:45.123456"
             }

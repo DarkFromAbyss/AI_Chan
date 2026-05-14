@@ -14,6 +14,7 @@ import os
 from core.config import settings
 from core.logger import get_logger
 from routers import chat
+from routers import tts
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -33,8 +34,8 @@ async def lifespan(app: FastAPI):
     """
     Lifespan context manager for startup and shutdown events.
     
-    Initializes the llm_core.SenseiAgent at application startup
-    and stores it in app.state for access by route handlers.
+    Initializes services at application startup and cleans up at shutdown.
+    Initializes: SenseiAgent (LLM core), VoicevoxTTSService (audio synthesis).
 
     Args:
         app: FastAPI application instance
@@ -63,11 +64,43 @@ async def lifespan(app: FastAPI):
         logger.warning("Chat endpoint will be unavailable. Ensure GOOGLE_API_KEY is set and config.yaml exists.")
         app.state.sensei_agent = None
     
+    # Initialize Voicevox TTS Service
+    try:
+        from tts.voicevox_service import VoicevoxTTSService
+        
+        logger.info("Initializing Voicevox TTS service with real-time auto-play")
+        # auto_play=True enables in-memory audio playback (requires sounddevice)
+        tts_service = VoicevoxTTSService(auto_play=True)
+        
+        # Start the TTS engine with polling mechanism
+        if tts_service.start_engine(timeout=30):
+            app.state.tts_service = tts_service
+            logger.info(
+                "Voicevox TTS engine started successfully and ready for real-time synthesis"
+            )
+        else:
+            logger.warning("Failed to start Voicevox TTS engine. TTS endpoint will be unavailable.")
+            app.state.tts_service = tts_service  # Store anyway for error handling
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize TTS service: {e}", exc_info=True)
+        logger.warning("TTS endpoint will be unavailable.")
+        app.state.tts_service = None
+    
     yield
     
     # ========== SHUTDOWN ==========
     logger.info(f"Shutting down {settings.app_name}")
-    # Clean up any resources if needed
+    
+    # Clean up TTS service
+    if hasattr(app.state, "tts_service") and app.state.tts_service:
+        try:
+            app.state.tts_service.stop_engine()
+            logger.info("Voicevox TTS engine stopped")
+        except Exception as e:
+            logger.error(f"Error stopping TTS engine: {e}")
+    
+    # Clean up LLM service
     if hasattr(app.state, "sensei_agent") and app.state.sensei_agent:
         logger.info("SenseiAgent resources cleaned up")
 
@@ -143,6 +176,9 @@ def create_app() -> FastAPI:
 
     # Include chat routes
     app.include_router(chat.router)
+    
+    # Include TTS routes
+    app.include_router(tts.router)
 
     logger.info("FastAPI application created and configured successfully")
     return app
