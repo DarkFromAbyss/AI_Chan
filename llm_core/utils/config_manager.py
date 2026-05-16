@@ -76,7 +76,6 @@ def get_model_path(config: Dict[str, Any], model_name: str) -> str:
     logger.debug("Resolved model path for '%s': %s", model_name, model_path)
     return model_path
 
-
 def get_data_directory(config: Dict[str, Any]) -> str:
     """Resolve data directory path from configuration.
     

@@ -49,47 +49,54 @@ class SystemPromptManager:
         """
         xml_output_enforcer = """[MANDATORY OUTPUT FORMAT - DUAL TRACK XML]
 
-You MUST output responses ONLY using these EXACT FOUR independent XML tags. 
-CRITICAL: DO NOT nest tags inside each other. They MUST be top-level siblings.
+You MUST output responses ONLY using these EXACT FOUR independent XML tags as top-level siblings. 
+CRITICAL: DO NOT wrap your response in markdown code blocks (```xml). DO NOT nest tags.
 
 <html>
-  [Detailed academic content with HTML5 tags: <p>, <ul>, <li>, <b>, <i>, <br>, etc.]
-  [Use this section for explanations, examples, structured data in {display_lang}]
+  [Dynamic HTML Content for Web UI]
+  - For VOCABULARY queries, use Layout A (Flashcard):
+    <div class="vocab-card">
+      <h2 class="vocab-word">Kanji/Kana (Romaji)</h2>
+      <p class="vocab-meaning"><b>Ý nghĩa:</b> ...</p>
+      <hr>
+      <div class="vocab-details"><p><b>Từ loại:</b> ...</p><p><b>Ví dụ:</b></p><ul><li>...</li></ul></div>
+    </div>
+  
+  - For GRAMMAR queries, use Layout B (Structural Analysis):
+    <div class="grammar-container">
+      <h2 class="grammar-title">Cấu trúc: ...</h2>
+      <p class="grammar-concept"><b>Khái niệm:</b> ...</p>
+      <div class="grammar-usage"><p><b>Cách kết nối:</b> ...</p></div>
+      <div class="grammar-examples"><p><b>Ví dụ cụ thể:</b></p><ul><li>...<br><small>...</small></li></ul></div>
+      <div class="grammar-note"><p><b>💡 Chú ý:</b> ...</p></div>
+    </div>
+  
+  - For CASUAL/OTHER queries, use Layout C (Minimal):
+    <p>[Short paragraph in {display_lang}]</p>
 </html>
 
 <display>
-  [Short, conversational text in {display_lang} summarizing the response]
-  [NO technical jargon, only natural language]
-  [Max 150 characters]
+  [Short, emotional summary text in {display_lang}. NO HTML. Max 150 chars]
 </display>
 
 <voice>
-  [Pure Japanese text for TTS synthesis]
-  [Use Hiragana/Katakana for difficult Kanji to ensure clarity]
-  [Include natural Japanese rhythm and punctuation: 、。！？]
-  [This section MUST be natural-sounding Japanese, not robotic]
-  [Max 300 characters]
+  [Pure natural Japanese for TTS. Use Hiragana/Katakana for difficult Kanji. Max 300 chars]
 </voice>
 
 <intent>
-  [ONLY "other" or "search" - MUST be in English]
-  [Use "search" if user is asking for knowledge/information]
-  [Use "other" for casual conversation, greetings, etc.]
+  [ONLY "other" or "search"]
 </intent>
 
-CRITICAL RULES:
-1. Always use ALL FOUR tags exactly as formatted above.
-2. No markdown, no code blocks, no extra text outside these tags.
-3. Tags must be INDEPENDENT (e.g., <voice> must NOT be inside <html>).
-4. <voice> MUST be natural, fluent Japanese ONLY (never mix languages).
-5. <display> must be in the language specified: {display_lang}.
+CRITICAL INSTRUCTIONS:
+1. Every response MUST contain all four tags in strict order: <html>, <display>, <voice>, <intent>.
+2. The <html> content is injected directly into a web interface; ensure all tags are closed properly.
+3. No text, thought process, or markdown formatting is allowed outside the XML tags.
 
 [SYSTEM SETTINGS]
-- Output language for <display>: "{display_lang}"
-- Current time for context: {recent_time}
-- TTS voice synthesis enabled: YES
+- Output language for <display> and explanations: "{display_lang}"
+- Current time context: {recent_time}
+- TTS Voice Synthesis: Enabled
 - Max reasoning steps: 3
-- Safety guardrails: Enabled
 """
         
         system_prompt = f"""
