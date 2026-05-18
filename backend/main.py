@@ -30,8 +30,8 @@ async def lifespan(app: FastAPI):
     """
     Lifespan context manager for startup and shutdown events.
     
-    Initializes the llm_core.SenseiAgent at application startup
-    and stores it in app.state for access by route handlers.
+    Initializes the llm_core.SenseiAgent and Voicevox TTS service at startup
+    and stores them in app.state for access by route handlers.
 
     Args:
         app: FastAPI application instance
@@ -43,10 +43,42 @@ async def lifespan(app: FastAPI):
     # Add project root to sys.path for llm_core imports
     backend_dir = Path(__file__).parent
     project_root = backend_dir.parent
+    logger.debug(f"Backend directory: {backend_dir}")
+    logger.debug(f"Project root directory: {project_root}")
     
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
         logger.debug(f"Added project root to sys.path: {project_root}")
+    
+    # Load centralized configuration
+    config_loader = None
+    try:
+        from llm_core.utils.config_manager import ConfigLoader
+        
+        config_path = project_root / "config.yaml"
+        
+        if not config_path.exists():
+            raise FileNotFoundError(
+                f"Configuration file not found at {config_path}. "
+                f"Ensure config.yaml exists in the project root directory."
+            )
+        
+        config_loader = ConfigLoader(str(config_path))
+        logger.info("ConfigLoader initialized with config: %s", config_path)
+        app.state.config_loader = config_loader
+        
+    except ImportError as import_error:
+        logger.warning(
+            "Failed to import ConfigLoader from llm_core: %s. "
+            "Using default configuration.",
+            import_error
+        )
+    except FileNotFoundError as file_error:
+        logger.warning(
+            "Configuration file not found: %s. "
+            "Using default configuration.",
+            file_error
+        )
     
     # Initialize SenseiAgent for chat processing
     try:
@@ -113,7 +145,7 @@ async def lifespan(app: FastAPI):
         from tts.voicevox_service import VoicevoxTTSService
         
         logger.info("Initializing Voicevox TTS service...")
-        tts_service = VoicevoxTTSService(auto_play=False)
+        tts_service = VoicevoxTTSService(auto_play=False, config_loader=config_loader)
         
         # Start the Voicevox engine subprocess with 30s timeout
         if tts_service.start_engine(timeout=30):

@@ -27,18 +27,13 @@ except ImportError:
 
 logger = get_logger(__name__)
 
-# Voicevox default configuration - Use windows-directml as specified
-VOICEVOX_HOST = os.getenv("VOICEVOX_HOST", "127.0.0.1")
-VOICEVOX_PORT = int(os.getenv("VOICEVOX_PORT", "50021"))
-VOICEVOX_ENGINE_PATH = Path(
-    r"C:\Users\PC\Desktop\AI_NAGARI-Artificial_Intelligence_Nihongo_Agentic_RAG_Inference\voicevox\windows-directml\run.exe"
-)
-
-# TTS parameters
-VOICEVOX_TIMEOUT = 10  # Seconds
-VOICEVOX_SPEAKER_ID = 1  # Female voice (default)
-ENGINE_STARTUP_MAX_RETRIES = 30  # Max polling attempts (30 * 0.5s = 15s)
-ENGINE_INITIAL_WAIT = 2.0  # Initial wait before polling (Windows startup overhead)
+# Configuration defaults (used if config_loader not provided)
+DEFAULT_VOICEVOX_HOST = "127.0.0.1"
+DEFAULT_VOICEVOX_PORT = 50021
+DEFAULT_VOICEVOX_TIMEOUT = 10
+DEFAULT_VOICEVOX_SPEAKER_ID = 1
+DEFAULT_ENGINE_STARTUP_MAX_RETRIES = 30
+DEFAULT_ENGINE_INITIAL_WAIT = 2.0
 
 
 def ensure_executable_permissions(exe_path: Path) -> bool:
@@ -100,11 +95,12 @@ class VoicevoxTTSService:
     - Thread-safe audio playback
     """
     
-    def __init__(self, auto_play: bool = True):
+    def __init__(self, auto_play: bool = True, config_loader=None):
         """Initialize TTS service.
         
         Args:
             auto_play: Enable automatic playback after synthesis (requires sounddevice)
+            config_loader: Optional ConfigLoader instance for configuration (uses defaults if None)
         """
         self.engine_process: Optional[subprocess.Popen] = None
         self.is_ready = False
@@ -113,11 +109,50 @@ class VoicevoxTTSService:
         self.auto_play = auto_play and SOUNDDEVICE_AVAILABLE
         self._playback_thread: Optional[threading.Thread] = None
         
+        # Load TTS configuration from ConfigLoader or use defaults
+        if config_loader:
+            try:
+                self.voicevox_host = config_loader.get_parameter("tts.voicevox_host")
+                self.voicevox_port = config_loader.get_parameter("tts.voicevox_port")
+                self.voicevox_timeout = config_loader.get_parameter("tts.voicevox_timeout")
+                self.voicevox_speaker_id = config_loader.get_parameter("tts.voicevox_speaker_id")
+                self.engine_startup_max_retries = config_loader.get_parameter("tts.engine_startup_max_retries")
+                self.engine_initial_wait = config_loader.get_parameter("tts.engine_initial_wait")
+                
+                # Resolve voicevox engine path from config
+                engine_path_rel = config_loader.get_parameter("tts.voicevox_engine_path")
+                self.voicevox_engine_path = config_loader.project_root / engine_path_rel
+                
+                self.logger.info("Voicevox TTS configuration loaded from config file")
+            except KeyError as config_error:
+                self.logger.warning(
+                    "Failed to load TTS config from ConfigLoader, using defaults: %s",
+                    config_error
+                )
+                self._set_defaults()
+        else:
+            self._set_defaults()
+        
         if auto_play and not SOUNDDEVICE_AVAILABLE:
             self.logger.warning(
                 "sounddevice not installed. Install with: pip install sounddevice numpy"
             )
             self.auto_play = False
+    
+    def _set_defaults(self) -> None:
+        """Set TTS configuration to defaults (from environment or hardcoded)."""
+        self.voicevox_host = os.getenv("VOICEVOX_HOST", DEFAULT_VOICEVOX_HOST)
+        self.voicevox_port = int(os.getenv("VOICEVOX_PORT", str(DEFAULT_VOICEVOX_PORT)))
+        self.voicevox_timeout = DEFAULT_VOICEVOX_TIMEOUT
+        self.voicevox_speaker_id = DEFAULT_VOICEVOX_SPEAKER_ID
+        self.engine_startup_max_retries = DEFAULT_ENGINE_STARTUP_MAX_RETRIES
+        self.engine_initial_wait = DEFAULT_ENGINE_INITIAL_WAIT
+        
+        # Try to construct voicevox path from common location
+        self.voicevox_engine_path = Path(
+            r"voicevox\windows-directml\run.exe"
+        )
+        self.logger.debug("Using default Voicevox TTS configuration")
     
     def start_engine(self, timeout: int = 60) -> bool:
         """Start the Voicevox engine subprocess with polling readiness check.
@@ -132,32 +167,32 @@ class VoicevoxTTSService:
             self.logger.debug("Voicevox engine already running")
             return True
         
-        if not VOICEVOX_ENGINE_PATH.exists():
+        if not self.voicevox_engine_path.exists():
             self.logger.error(
                 "Voicevox executable not found at %s", 
-                VOICEVOX_ENGINE_PATH
+                self.voicevox_engine_path
             )
             return False
         
         # Step 1: Verify executable permissions
-        if not ensure_executable_permissions(VOICEVOX_ENGINE_PATH):
+        if not ensure_executable_permissions(self.voicevox_engine_path):
             self.logger.error(
                 "Cannot execute Voicevox binary at %s - permission denied",
-                VOICEVOX_ENGINE_PATH
+                self.voicevox_engine_path
             )
             return False
         
         try:
             self.logger.info(
                 "Starting Voicevox engine from %s", 
-                VOICEVOX_ENGINE_PATH
+                self.voicevox_engine_path
             )
-            # engine_dir = VOICEVOX_ENGINE_PATH.parent
+            # engine_dir = self.voicevox_engine_path.parent
             
-            os.chmod(str(VOICEVOX_ENGINE_PATH), 0o755)
+            os.chmod(str(self.voicevox_engine_path), 0o755)
             
             self.engine_process = subprocess.Popen(
-                [str(VOICEVOX_ENGINE_PATH)],
+                [str(self.voicevox_engine_path)],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 # cwd=str(engine_dir),
@@ -183,18 +218,18 @@ class VoicevoxTTSService:
             self.logger.info(
                 "Engine process started (PID: %d). Waiting %.1f seconds for initialization...",
                 self.engine_process.pid,
-                ENGINE_INITIAL_WAIT
+                self.engine_initial_wait
             )
-            time.sleep(ENGINE_INITIAL_WAIT)
+            time.sleep(self.engine_initial_wait)
             
             # Step 4: Poll for readiness
             self.logger.info(
                 "Polling http://%s:%d/version for readiness...", 
-                VOICEVOX_HOST, 
-                VOICEVOX_PORT
+                self.voicevox_host, 
+                self.voicevox_port
             )
             
-            if self._wait_for_readiness(timeout - int(ENGINE_INITIAL_WAIT)):
+            if self._wait_for_readiness(timeout - int(self.engine_initial_wait)):
                 self.is_ready = True
                 startup_time = time.time() - self.engine_start_time
                 self.logger.info(
@@ -222,19 +257,22 @@ class VoicevoxTTSService:
     def synthesize(
         self, 
         text: str, 
-        speaker_id: int = VOICEVOX_SPEAKER_ID,
+        speaker_id: Optional[int] = None,
         auto_play_override: Optional[bool] = None
     ) -> Tuple[Optional[TTSAudioOutput], Optional[str]]:
         """Synthesize text to speech using Voicevox engine and auto-play if enabled.
         
         Args:
             text: Japanese text to synthesize
-            speaker_id: Voicevox speaker ID (default: 1 for female voice)
+            speaker_id: Voicevox speaker ID (default: from config)
             auto_play_override: Override the default auto_play setting for this call
         
         Returns:
             Tuple of (TTSAudioOutput, error_message). One will be None.
         """
+        if speaker_id is None:
+            speaker_id = self.voicevox_speaker_id
+        
         if not text or not isinstance(text, str):
             error = "Invalid text input for TTS synthesis"
             self.logger.warning(error)
@@ -256,9 +294,9 @@ class VoicevoxTTSService:
             )
             
             query_response = requests.post(
-                f"http://{VOICEVOX_HOST}:{VOICEVOX_PORT}/audio_query",
+                f"http://{self.voicevox_host}:{self.voicevox_port}/audio_query",
                 params={"text": text, "speaker": speaker_id},
-                timeout=VOICEVOX_TIMEOUT
+                timeout=self.voicevox_timeout
             )
             
             if query_response.status_code != 200:
@@ -275,10 +313,10 @@ class VoicevoxTTSService:
             )
             
             synthesis_response = requests.post(
-                f"http://{VOICEVOX_HOST}:{VOICEVOX_PORT}/synthesis",
+                f"http://{self.voicevox_host}:{self.voicevox_port}/synthesis",
                 params={"speaker": speaker_id},
                 json=query_data,
-                timeout=VOICEVOX_TIMEOUT
+                timeout=self.voicevox_timeout
             )
             
             if synthesis_response.status_code != 200:
@@ -487,7 +525,7 @@ class VoicevoxTTSService:
         """
         try:
             response = requests.get(
-                f"http://{VOICEVOX_HOST}:{VOICEVOX_PORT}/version",
+                f"http://{self.voicevox_host}:{self.voicevox_port}/version",
                 timeout=1
             )
             return response.status_code == 200

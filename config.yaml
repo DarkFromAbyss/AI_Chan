@@ -1,4 +1,113 @@
-data_directory: C:\Users\PC\Desktop\AI_NAGARI-Artificial_Intelligence_Nihongo_Agentic_RAG_Inference\data
-models:
-  Qwen2.5-7B-Instruct: C:\Users\PC\Desktop\AI_NAGARI-Artificial_Intelligence_Nihongo_Agentic_RAG_Inference\models\Qwen2.5-7B-Instruct
-  all-MiniLM-L6-v2: C:\Users\PC\Desktop\AI_NAGARI-Artificial_Intelligence_Nihongo_Agentic_RAG_Inference\models\all-MiniLM-L6-v2
+# ============================================================================
+# AI NAGARI - CENTRALIZED CONFIGURATION MANAGEMENT
+# ============================================================================
+# This file defines all operational parameters and directory paths.
+# Strictly divided into two sections: paths (directories) and parameters (values)
+# ============================================================================
+
+
+# ============================================================================
+# SECTION A: DIRECTORY PATHS
+# All keys must match physical subdirectory names within the project
+# ============================================================================
+paths:
+  root: "."  # Project root directory (relative or absolute)
+  
+  # Core application directories
+  backend: "backend"
+  llm_core: "llm_core"
+  frontend: "frontend"
+  
+  # Data and resources
+  data: "data"
+  models: "models"
+  brain: "brain"
+  database: "database"
+  voicevox: "voicevox"
+  
+  # Development and documentation
+  docs: "docs"
+  notebooks: "notebooks"
+  test: "test"
+  env: "env"
+
+
+# ============================================================================
+# SECTION B: OPERATIONAL PARAMETERS
+# Logically organized by module/domain
+# ============================================================================
+parameters:
+  
+  # ---- Backend Server Configuration ----
+  server:
+    host: "127.0.0.1"
+    port: 8000
+    app_name: "AI NARAGI Chat API"
+    app_version: "1.0.0"
+    debug: false
+    log_level: "INFO"
+    
+    # CORS allowed origins
+    cors_origins:
+      - "http://localhost:3000"      # Next.js dev server
+      - "http://127.0.0.1:3000"
+      - "http://localhost:5173"      # Vite dev server
+      - "http://127.0.0.1:5173"
+  
+  
+  # ---- LLM/AI Configuration ----
+  llm:
+    # Google Gemini LLM settings
+    model_name: "gemini-2.5-flash-lite"
+    temperature: 0.7
+    api_key_env_var: "GOOGLE_API_KEY"
+    
+    # Message trimming
+    max_tokens_for_trimming: 7
+    
+    # Brain/System prompts version
+    brain_version: "7B"
+  
+  
+  # ---- Voicevox TTS Configuration ----
+  tts:
+    # Voicevox engine connection
+    voicevox_host: "127.0.0.1"
+    voicevox_port: 50021
+    voicevox_timeout: 10  # seconds
+    
+    # Engine executable path (Windows specific, relative to project root)
+    voicevox_engine_path: "voicevox/windows-directml/run.exe"
+    
+    # TTS synthesis parameters
+    voicevox_speaker_id: 1  # Female voice (default)
+    
+    # Engine lifecycle management
+    engine_startup_max_retries: 30      # Max polling attempts (30 * 0.5s = 15s)
+    engine_initial_wait: 2.0            # Initial wait before polling (seconds)
+    engine_startup_timeout: 30          # Total timeout for engine startup
+  
+  
+  # ---- Data and Model Configuration ----
+  data:
+    # Data directory (absolute or relative to root)
+    data_directory: "data"
+    
+    # Supported models and their locations (absolute or relative to root)
+    models:
+      Qwen2.5-7B-Instruct: "models/Qwen2.5-7B-Instruct"
+      all-MiniLM-L6-v2: "models/all-MiniLM-L6-v2"
+    
+    # Data files
+    anki_file: "data/collection.anki21"
+    grammar_guide: "data/grammar/guide.md"
+    vocabulary_csv: "data/vocabulary/df_final.csv"
+    jmdict_json: "data/vocabulary/jmdict-eng-common-3.6.2.json"
+    experiment_results: "data/experiment_results.json"
+    mock_queries: "data/mock_queries.md"
+  
+  
+  # ---- Environment Configuration ----
+  environment:
+    env_file: ".env"
+    env_file_encoding: "utf-8"

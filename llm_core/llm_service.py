@@ -18,7 +18,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from llm_core.schemas import MessageInputSchema, ModelResponseSchema
 from llm_core.semantic_cache import SenseiSemanticCache
 from llm_core.utils.logger import get_logger
-from llm_core.utils.config_manager import load_config, get_model_path, get_data_directory
+from llm_core.utils.config_manager import ConfigLoader, load_config, get_model_path, get_data_directory
 from llm_core.utils.text_normalizer import extract_dual_track
 from llm_core.utils.tag_extractor import TagExtractor
 from llm_core.agents.state_definitions import AgentState
@@ -54,10 +54,13 @@ class SenseiAgent:
         """
         logger.info("Initializing SenseiAgent...")
         
-        # Load configuration
-        self.config = load_config(config_path)
-        self.data_dir = get_data_directory(self.config)
+        # Load configuration using ConfigLoader
+        self.config_loader = ConfigLoader(config_path)
+        self.config = self.config_loader.config  # Keep for backward compatibility
+        self.data_dir = str(self.config_loader.get_data_directory())
         self.enable_cache = enable_cache
+        
+        logger.info("Configuration loaded from %s", config_path)
         
         # Initialize semantic cache
         self.semantic_cache = SenseiSemanticCache()
@@ -65,40 +68,38 @@ class SenseiAgent:
         
         # Initialize LLM (Google Gemini)
         if not api_key:
-            # Xác định đường dẫn tuyệt đối đến file .env
-            # Cách 1: Nếu .env ở thư mục gốc của dự án:
-            env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+            # Try to load from .env file (project root)
+            env_path = self.config_loader.project_root / ".env"
             
-            # Cách 2: Nếu .env nằm cùng thư mục với llm_service.py (trong thư mục llm_core)
-            # env_path = os.path.join(os.path.dirname(__file__), '.env')
-            
-            # Khuyên dùng: Để .env ở thư mục gốc dự án
-            
-            if os.path.exists(env_path):
-                 load_dotenv(env_path)
+            if env_path.exists():
+                load_dotenv(str(env_path))
+                logger.debug("Environment variables loaded from %s", env_path)
             else:
-                 logger.warning(f"File .env không được tìm thấy tại: {env_path}")
+                logger.warning("File .env not found at %s", env_path)
             
             api_key = os.environ.get("GOOGLE_API_KEY")
 
         if not api_key:
             raise ValueError("GOOGLE_API_KEY not found in environment. Please check your .env file or environment variables.")
-            
+        
+        # Get LLM configuration from config.yaml
+        llm_model = self.config_loader.get_parameter_safe("llm.model_name", "gemini-2.5-flash-lite")
+        llm_temperature = self.config_loader.get_parameter_safe("llm.temperature", 0.7)
         
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash-lite",
+            model=llm_model,
             api_key=api_key,
-            temperature=0.7
+            temperature=llm_temperature
         )
-        logger.info("Google Gemini LLM initialized")
+        logger.info("Google Gemini LLM initialized with model: %s", llm_model)
         
         # Bind tools to LLM
         self.tools = [search_vocabulary, search_grammar, search_grammar_doc]
         self.llm_with_tools = self.llm.bind_tools(self.tools)
         
-        # Initialize system prompts
-        brain_path = os.path.join(os.path.dirname(self.data_dir), "brain", "7B")
-        self.prompt_manager = SystemPromptManager(brain_path)
+        # Initialize system prompts using brain path from ConfigLoader
+        brain_path = self.config_loader.get_brain_path()
+        self.prompt_manager = SystemPromptManager(str(brain_path))
         logger.info("System prompts loaded from %s", brain_path)
         
         # Build LangGraph
@@ -146,8 +147,9 @@ class SenseiAgent:
         full_messages = [sys_msg] + state["messages"]
         
         # Apply message trimming to respect context windows
+        max_tokens_trim = self.config_loader.get_parameter_safe("llm.max_tokens_for_trimming", 7)
         trimmer = trim_messages(
-            max_tokens=7,
+            max_tokens=max_tokens_trim,
             strategy="last",
             token_counter=len,
             include_system=True,
