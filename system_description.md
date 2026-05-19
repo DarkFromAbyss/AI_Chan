@@ -897,6 +897,118 @@ Text appears in 3D space alongside avatar
 - ✅ IMPROVED: Clearer response extraction logic with descriptive variable names
 
 **Process Flow:**
+1. User submits message via input
+2. POST to /api/chat with message, session_id, language
+3. Backend returns `BackendChatResponse` with display, voice, display2d
+4. ChatPanel extracts response fields
+5. Creates Message object with voiceText from response.voice
+6. Calls setDisplayContent(response.display2d) and setStatusVoiceText(response.voice)
+7. Updates message state, triggering auto-audio synthesis
+8. Auto-synthesized audio blob stored in Message
+9. TTS service manages audio queue to prevent overlapping playback
+
+---
+
+## 🎨 TIER 3: Frontend - Response Parsing & Status Indicator (NEW)
+
+### Component 18: ResponseParser Utilities (frontend/utils/response-parser.ts - NEW)
+
+**Name:** `ResponseParser` module with utility functions and `ParsedResponse` interface
+
+**Internal Dependencies:**
+- `RegExp` (JavaScript standard library for pattern matching)
+
+**Purpose:** Extract XML tag content from backend LLM responses with robust regex matching and fallback logic
+
+**Key Functions:**
+- `extractXmlTagContent(xml, tagName)` - Core regex extractor for any XML tag
+- `extractVoiceTag(responseText)` - Extract `<voice>...</voice>` tag content
+- `extractDisplayTag(responseText)` - Extract `<display>...</display>` tag content
+- `extractDisplay2dTag(responseText)` - Extract `<display2d>...</display2d>` tag content
+- `hasVoiceTag(responseText)` - Boolean check for voice tag presence
+- `sanitizeVoiceText(voiceText)` - Normalize whitespace in extracted text
+- `parseBackendResponse(responseText, defaultDisplay)` - Full response parsing with fallbacks
+
+**Process Flow:**
+1. Accept raw response string from backend
+2. Apply case-insensitive regex pattern: `<tagName\s*>([\\s\\S]*?)<\/tagName\s*>` for each tag
+3. Extract matched content and strip leading/trailing whitespace
+4. Return `ParsedResponse` object containing:
+   - display: display tag content (fallback to "No response")
+   - voice: voice tag content or null
+   - display2d: display2d tag content or null
+   - hasVoice: boolean flag for voice presence
+5. Sanitize voice text by collapsing multiple whitespace to single space
+6. Return fallbacks if tags missing
+
+**Error Handling:**
+- Invalid regex matches → return null
+- Missing tags → use default values or null
+- Malformed XML → extract best effort with regex (non-greedy matching)
+- Empty extracted text → treat as null
+
+---
+
+### Component 19: Dynamic Status Indicator (Frontend Multi-Component Update)
+
+**Name:** Status Badge Dynamic Update System
+
+**Internal Dependencies:**
+- `ChatPanel` (voice text extraction and passing)
+- `AppLayout` (state management)
+- `CharacterShowcase` (status badge rendering)
+
+**Purpose:** Display AI voice response text in bottom status badge, dynamically updating on each user-agent interaction cycle
+
+**Components Modified:**
+
+**ChatPanel (frontend/components/chat-panel.tsx):**
+- ✅ ADDED: `setStatusVoiceText` prop callback
+- ✅ UPDATED: Pass `setStatusVoiceText(data.voice)` when response received
+- ✅ Purpose: Extract voice tag from response and propagate upward
+
+**AppLayout (frontend/components/app-layout.tsx):**
+- ✅ ADDED: `statusVoiceText` state
+- ✅ ADDED: `setStatusVoiceText` handler
+- ✅ UPDATED: Pass both props to child components
+- ✅ Purpose: Central state management for voice text lifecycle
+
+**CharacterShowcase (frontend/components/character-showcase.tsx):**
+- ✅ ADDED: `statusVoiceText` prop in interface
+- ✅ ADDED: `getStatusBadgeText()` function with priority logic
+- ✅ UPDATED: Status badge to call `getStatusBadgeText()`
+- ✅ Purpose: Render voice text in UI with fallback to default
+
+**Process Flow (User-Agent Interaction Cycle):**
+1. User submits prompt in ChatPanel
+2. ChatPanel calls backend API with message
+3. Backend returns response with `<voice>...</voice>` tag
+4. ChatPanel extracts voice text: `data.voice`
+5. ChatPanel calls `setStatusVoiceText(data.voice)`
+6. AppLayout state updates with new voice text
+7. CharacterShowcase receives updated `statusVoiceText` prop
+8. Component renders: Badge text → `getStatusBadgeText()` → returns `statusVoiceText` if present
+9. UI updates dynamically (no full re-render needed, only badge text)
+10. Automatic fallback to "NARAGI • 3D Model Active" when no voice text available
+
+**Badge Text Priority (getStatusBadgeText function):**
+1. Display voice text if available (extracted from `<voice>` tag) - **PRIMARY**
+2. Display model status text if no voice text:
+   - "NARAGI • 3D Model Active" if modelStatus === "loaded"
+   - "NARAGI • Stage Ready" if modelStatus !== "loaded"
+   - **FALLBACK**
+
+**Error Handling & Edge Cases:**
+- Missing `<voice>` tag in response → no voice text extracted → fallback to default
+- Empty voice text after extraction → fallback to default
+- Multiple responses in rapid succession → latest voice text overwrites previous
+- Network error → statusVoiceText remains null → fallback to default
+- Component unmount → state cleanup automatic (React lifecycle)
+
+---
+
+**Last Updated:** May 19, 2026  
+**Version:** 1.4.0 (Dynamic Status Indicator - Voice Tag Integration)
 
 **Response Handling (handleSubmit):**
 1. User submits message via form

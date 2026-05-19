@@ -10,6 +10,8 @@ interface CharacterShowcaseProps {
   className?: string;
   /** Display text content to render in 3D WebGL space */
   displayContent?: string | null;
+  /** Voice text from AI response to display in status indicator */
+  statusVoiceText?: string | null;
 }
 
 /**
@@ -106,6 +108,7 @@ function PlaceholderCharacter() {
 export function CharacterShowcase({
   className,
   displayContent = null,
+  statusVoiceText = null,
 }: CharacterShowcaseProps) {
   const [modelStatus, setModelStatus] = useState<"loading" | "loaded" | "error">(
     "loading"
@@ -118,6 +121,25 @@ export function CharacterShowcase({
   const handleLoad = useCallback(() => {
     setModelStatus("loaded");
   }, []);
+
+  /**
+   * Determine status badge text based on:
+   * 1. Voice text from AI response (priority)
+   * 2. Model loading state fallback
+   * 3. Default text if no voice text provided
+   */
+  const getStatusBadgeText = (): string => {
+    // Display voice text if available (updated dynamically on each response)
+    if (statusVoiceText) {
+      return statusVoiceText;
+    }
+    
+    // Fallback to model status-based text
+    if (modelStatus === "loaded") {
+      return "NARAGI • 3D Model Active";
+    }
+    return "NARAGI • Stage Ready";
+  };
 
   return (
     <main
@@ -173,9 +195,7 @@ export function CharacterShowcase({
         {/* Status Badge */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border/50 z-10 pointer-events-none">
           <span className="text-xs font-medium text-muted-foreground">
-            {modelStatus === "loaded"
-              ? "NARAGI • 3D Model Active"
-              : "NARAGI • Stage Ready"}
+            {getStatusBadgeText()}
           </span>
         </div>
       </div>

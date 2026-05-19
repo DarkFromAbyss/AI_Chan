@@ -50,9 +50,9 @@ function sanitizeContentForDisplay(content: string): string {
 
 export function WebGLTextRenderer({
   content,
-  position = [1.5, 1, -1],
-  rotation = [0, -0.25, 0],
-  scale = 0.9,
+  position = [1, 1, -1],
+  rotation = [0, 0, 0],
+  scale = 0.5,
   className,
 }: WebGLTextRendererProps) {
   const sanitized_content = useMemo(() => {

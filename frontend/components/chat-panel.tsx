@@ -11,6 +11,8 @@ interface ChatPanelProps {
   className?: string;
   /** Setter to provide 3D display content to the character showcase */
   setDisplayContent?: (content: string | null) => void;
+  /** Setter to provide voice text for status indicator in character showcase */
+  setStatusVoiceText?: (voiceText: string | null) => void;
 }
 
 interface Message {
@@ -111,7 +113,7 @@ function ChatMessage({
   );
 }
 
-export function ChatPanel({ className, setDisplayContent }: ChatPanelProps) {
+export function ChatPanel({ className, setDisplayContent, setStatusVoiceText }: ChatPanelProps) {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [showGreeting, setShowGreeting] = useState(true);
@@ -252,6 +254,9 @@ export function ChatPanel({ className, setDisplayContent }: ChatPanelProps) {
 
       setMessages((prev) => [...prev, aiResponse]);
       setDisplayContent?.(data.display2d ?? null);
+      
+      // Update status indicator with voice text (or null for fallback to default)
+      setStatusVoiceText?.(data.voice ?? null);
     } catch {
       const errorResponse: Message = {
         id: (Date.now() + 1).toString(),
