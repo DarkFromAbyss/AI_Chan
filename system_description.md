@@ -689,57 +689,103 @@ When updating any component documented here:
 
 ## 🎨 TIER 3 (REFACTORED): Frontend - WebGL Text Rendering & Multi-Modal Response Pipeline
 
-### Component 14: WebGLTextRenderer (frontend/components/3d/webgl-text-renderer.tsx)
+### Component 14: WebGLTextRenderer (frontend/components/3d/webgl-text-renderer.tsx - MARKDOWN INTEGRATION)
 
-**Name:** `WebGLTextRenderer` React component
+**Name:** `WebGLTextRenderer` React component (refactored for full Markdown support)
 
 **Internal Dependencies:**
-- `@react-three/drei.Html` (3D overlay rendering)
-- `isomorphic-dompurify` (XSS sanitization)
-- `@/lib/utils.cn` (classname merging)
-- React hooks: `useMemo`
+- `@react-three/drei.Html` (3D DOM overlay rendering)
+- `react-markdown` v10.1.0 (Markdown parsing and rendering)
+- `@/lib/utils.cn` (Tailwind classname merging)
+- React hooks: `useMemo`, `ReactNode` types
+- TypeScript types: `HeadingComponent`, `ListComponent`, `TableComponent`, `CodeComponent`
 
-**Purpose:** Render display text content within 3D WebGL space alongside VRM avatar using HTML overlay positioned in 3D coordinates
+**Purpose:** Render full-featured Markdown content within 3D WebGL space alongside VRM avatar, with complete support for headings, tables, lists, blockquotes, code blocks, and text formatting via DOM overlay positioned in 3D coordinates
 
-**Process Flow:**
-1. Accept content string (HTML or plain text) from props
-2. Sanitize HTML using DOMPurify to prevent XSS:
-   - Allow only safe tags: `<p>, <br>, <strong>, <em>, <u>, <span>`
-   - Block dangerous tags: `<script>, <iframe>, <object>, <embed>`
-   - Block event handlers: `onerror, onclick, onmouseover, onfocus, onload`
-3. Memoize sanitized content to prevent unnecessary re-renders
-4. Return early if content empty (null return)
-5. Render Html overlay with:
-   - Position: [1.5, 1, -1] (positioned right of avatar)
-   - Rotation: [0, -0.25, 0] (angled toward camera)
-   - Scale: 0.9 (optimized for readability)
-   - Glassmorphism styling: semi-transparent white/10 bg with blur
-   - Max dimensions: 520px wide, 420px height with scroll
-6. Set `aria-live="polite"` for accessibility
+**Process Flow (DOM-to-WebGL Bridge Strategy):**
+
+1. Accept markdown/plain text content string from props
+2. Validate content using memoized check (non-empty after trim)
+3. Return early if content empty (null return) → prevents unnecessary rendering
+4. **Markdown Parsing Phase:**
+   - Pass content to `ReactMarkdown` component with custom element renderers
+   - `react-markdown` internally parses markdown AST and applies sanitization:
+     - Blocks dangerous tags: `<script>, <iframe>, <object>, <embed>`
+     - Strips event handlers: no `onclick`, `onerror`, `onload`, etc.
+     - Allows only safe HTML elements within markdown (via `skipHtml={true}`)
+   - Custom components handle each markdown element type with glassmorphism styling
+5. **3D Context Bridge:**
+   - Wrap sanitized DOM tree in `@react-three/drei` `<Html>` component
+   - `<Html>` uses CSS 2D transforms + WebGL perspective for 3D positioning
+   - No texture rendering needed—DOM naturally projecting into 3D space
+   - Automatic z-indexing and depth culling via drei's implementation
+6. **Rendering Phase:**
+   - Apply glassmorphism styling (backdrop-blur-xl, rgba backdrop)
+   - Set bounds: max-width 520px, max-height 420px
+   - Enable overflow-y-auto for scrolling if content exceeds bounds
+   - Position in 3D space: [1, 1, -1] by default (right of avatar)
+   - Scale: 0.2 by default (adjustable)
+7. **Accessibility:**
+   - Set `aria-live="polite"` for screen readers
+   - Set `aria-label` describing overlay purpose
+   - Semantic HTML through markdown AST-to-DOM conversion
+
+**Markdown Element Custom Renderers:**
+- **Headings (h1-h6):** Sized typography with subtle borders (h1/h2) or font-weight emphasis (h3-h6)
+- **Paragraphs:** Compact spacing (mb-2) with line-height relaxed (leading-relaxed)
+- **Lists (ul/ol):** Nested list support with proper indentation via list-inside and ml-2 offset
+- **List Items (li):** Proper margin spacing for visual separation
+- **Blockquotes:** Left border (white/30) with italic styling and subtle background (white/5)
+- **Inline Code:** Dark background (slate-900/20), monospace, small font size
+- **Code Blocks:** Monospace rendering with dark background (slate-900/30), scrollable for long lines
+- **Tables:** Responsive table with:
+  - Header row: background white/15, bold text
+  - Data cells: border-right white/15 with hover effect (white/10)
+  - Proper alignment and padding (px-2 py-1)
+  - Overflow-x-auto for wide tables
+- **Text Formatting:** Strong (bold), Em (italic), Del (strikethrough with line-through)
+- **Links:** Blue color with hover state, opens in new tab with noopener/noreferrer for security
+- **Horizontal Rules:** Subtle white/20 border
 
 **Key Props:**
-- `content: string | null` - Display text (plain text or HTML)
-- `position?: [number, number, number]` - 3D position coordinates
-- `rotation?: [number, number, number]` - Rotation in radians
-- `scale?: number | [number, number, number]` - Scale factor
-- `className?: string` - Additional CSS classes
+- `content: string | null` - Markdown or plain text content
+- `position?: [number, number, number]` - 3D position coordinates (default: [1, 1, -1])
+- `rotation?: [number, number, number]` - Rotation in radians (default: [0, 0, 0])
+- `scale?: number | [number, number, number]` - Scale factor (default: 0.2)
+- `className?: string` - Additional CSS classes for wrapper div
 
-**Sanitization Details:**
-- Uses DOMPurify with strict profile
-- Removes style attributes (prevents CSS injection)
-- Strips data attributes (prevents event binding)
-- Returns empty string on sanitization error (fail-safe)
+**Security & Sanitization:**
+- `react-markdown` + `skipHtml={true}` prevents inline HTML injection
+- `disallowedElements` prop blocks dangerous elements: script, iframe, object, embed
+- No event handler attributes passed through (default-stripped by react-markdown)
+- Content treated as markdown source, not raw HTML (XSS-safe by design)
 
-**Styling:**
-- Backdrop blur (xl) + saturation (150%)
-- Border: white/15 with 1px width
-- Shadow: 0 28px 90px rgba(15,23,42,0.18)
-- Rounded corners: 3xl
-- Padding: 1rem (16px)
-- Text color: slate-900 (dark)
-- Overflow: auto (scroll if content exceeds 420px)
+**Styling (Glassmorphism + Tailwind):**
+- Backdrop: `backdrop-blur-xl backdrop-saturate-150`
+- Background: `rgba(255, 255, 255, 0.12)` with `bg-white/10`
+- Border: `border-white/15` (1px solid)
+- Shadow: `0 28px 90px rgba(15, 23, 42, 0.18)`
+- Rounded: `rounded-3xl`
+- Padding: `p-4` (1rem)
+- Text color: `text-slate-900` (dark) for contrast
+- Overflow: `overflow-y-auto` (scrollable)
+- Max dimensions: 520px wide × 420px tall
 
-**Error Handling:** Invalid HTML → DOMPurify sanitizes, XSS attempts → stripped silently, empty content → component returns null
+**Performance Optimizations:**
+- Content validation memoized via `useMemo` → prevents re-parsing on prop re-renders
+- Early null return when content empty → no unnecessary markdown parsing
+- React.ReactNode typing for component renderers → TypeScript strictness
+
+**Error Handling:**
+- Empty/null content → component returns null (no rendering)
+- Invalid markdown syntax → react-markdown gracefully degrades to text
+- XSS attempts in markdown → stripped by react-markdown sanitization
+- Oversized content → scrollable container handles overflow gracefully
+
+**Compatibility Notes:**
+- Fully compatible with existing `Scene3D` component and VRM avatar system
+- Works seamlessly with streaming responses from backend chat API
+- Supports dynamic content updates via prop changes
 
 ---
 

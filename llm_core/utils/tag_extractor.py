@@ -18,6 +18,7 @@ class ExtractedTags:
     
     display: str
     html: str
+    text: str
     voice: str
     intent: str
     raw_text: str
@@ -34,6 +35,7 @@ class TagExtractor:
     # Regex patterns for safe XML tag extraction
     TAG_PATTERNS = {
         'html': r'<html>(.*?)</html>',
+        'text': r'<text>(.*?)</text>',
         'display': r'<display>(.*?)</display>',
         'voice': r'<voice>(.*?)</voice>',
         'intent': r'<intent>(.*?)</intent>',
@@ -42,9 +44,10 @@ class TagExtractor:
     # Fallback values if extraction fails
     FALLBACK_VALUES = {
         'html': '<p>Processing error. Please try again.</p>',
+        'text': 'Processing error. Please try again.',
         'display': 'Xin lỗi, hệ thống gặp lỗi.',
         'voice': 'エラーが発生しました。',
-        'intent': 'other',
+        'intent': 'other'
     }
 
     @staticmethod
@@ -89,6 +92,7 @@ class TagExtractor:
             return ExtractedTags(
                 display=extracted['display'],
                 html=extracted['html'],
+                text=extracted['text'],
                 voice=extracted['voice'],
                 intent=extracted['intent'],
                 raw_text=llm_output,
@@ -146,7 +150,7 @@ class TagExtractor:
         Returns:
             True if all required tags are present
         """
-        required_tags = ['html', 'display', 'voice', 'intent']
+        required_tags = ['html', 'text','display', 'voice', 'intent']
         for tag in required_tags:
             pattern = f'<{tag}>.*?</{tag}>'
             if not re.search(pattern, text, re.DOTALL):
@@ -172,6 +176,7 @@ class TagExtractor:
         return ExtractedTags(
             display=TagExtractor.FALLBACK_VALUES['display'],
             html=TagExtractor.FALLBACK_VALUES['html'],
+            text=TagExtractor.FALLBACK_VALUES['text'],
             voice=TagExtractor.FALLBACK_VALUES['voice'],
             intent=TagExtractor.FALLBACK_VALUES['intent'],
             raw_text=raw_text,

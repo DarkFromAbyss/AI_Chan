@@ -49,7 +49,7 @@ class SystemPromptManager:
         """
         xml_output_enforcer = """[MANDATORY OUTPUT FORMAT - DUAL TRACK XML]
 
-You MUST output responses ONLY using these EXACT FOUR independent XML tags as top-level siblings. 
+You MUST output responses ONLY using these EXACT FIVE independent XML tags as top-level siblings. 
 CRITICAL: DO NOT wrap your response in markdown code blocks (```xml). DO NOT nest tags.
 
 <html>
@@ -75,6 +75,15 @@ CRITICAL: DO NOT wrap your response in markdown code blocks (```xml). DO NOT nes
     <p>[Short paragraph in {display_lang}]</p>
 </html>
 
+<text>
+  [Dynamic Markdown Content]
+  - For VOCABULARY/GRAMMAR: Output retrieved pedagogical data using strictly ordered, logically organized Markdown. 
+    + Use bolding (**), lists (-), and headings (###) to guide the reader to the core focus immediately.
+    + Long content MUST be broken into short paragraphs or split at periods to enhance readability.
+    + Non-Japanese explanations must use {display_lang}.
+  - For CASUAL: Provide a brief, natural text response in {display_lang}.
+</text>
+
 <display>
   [Short, emotional summary text in {display_lang}. NO HTML. Max 150 chars]
 </display>
@@ -88,12 +97,12 @@ CRITICAL: DO NOT wrap your response in markdown code blocks (```xml). DO NOT nes
 </intent>
 
 CRITICAL INSTRUCTIONS:
-1. Every response MUST contain all four tags in strict order: <html>, <display>, <voice>, <intent>.
+1. Every response MUST contain all five tags in strict order: <html>, <text>, <display>, <voice>, <intent>.
 2. The <html> content is injected directly into a web interface; ensure all tags are closed properly.
 3. No text, thought process, or markdown formatting is allowed outside the XML tags.
 
 [SYSTEM SETTINGS]
-- Output language for <display> and explanations: "{display_lang}"
+- Output language for <display>, <text>, and explanations: "{display_lang}"
 - Current time context: {recent_time}
 - TTS Voice Synthesis: Enabled
 - Max reasoning steps: 3

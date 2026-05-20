@@ -2,11 +2,12 @@
 
 import { useMemo } from "react";
 import { Html } from "@react-three/drei";
-import DOMPurify from "isomorphic-dompurify";
+import ReactMarkdown, { type Components } from "react-markdown";
 import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 
 interface WebGLTextRendererProps {
-  /** Plain text or minimal HTML content to display in 3D space */
+  /** Markdown or plain text content to display in 3D space */
   content: string | null;
   /** Position in 3D space [x, y, z] */
   position?: [number, number, number];
@@ -19,48 +20,179 @@ interface WebGLTextRendererProps {
 }
 
 /**
- * WebGLTextRenderer - Renders display text within 3D WebGL space
- * 
- * Renders sanitized HTML content as a 3D overlay positioned alongside
- * the VRM model. Content is displayed with glassmorphism styling and
- * supports multi-line text with scroll capability.
- * 
+ * WebGLTextRenderer - Renders Markdown content within 3D WebGL space
+ *
+ * Renders markdown content with full syntax support (headings, tables, lists,
+ * blockquotes, code blocks, and text formatting) as a 3D overlay positioned
+ * alongside the VRM model. Content is displayed with glassmorphism styling
+ * and supports multi-line text with scroll capability.
+ *
  * Process Flow:
- * 1. Accept display2d content as string (HTML or plain text)
- * 2. Sanitize HTML to prevent XSS attacks
- * 3. Render as Html overlay in 3D space using @react-three/drei
- * 4. Apply glassmorphism styling for visual consistency
- * 5. Position relative to camera for optimal visibility
+ * 1. Accept markdown content as string
+ * 2. Parse markdown using react-markdown with custom component renderers
+ * 3. Sanitize output via react-markdown's built-in XSS protection
+ * 4. Render as Html overlay in 3D space using @react-three/drei
+ * 5. Apply glassmorphism styling for visual consistency
+ * 6. Position relative to camera for optimal visibility
+ *
+ * WebGL Bridge Strategy:
+ * - Uses @react-three/drei's <Html> component for DOM-to-3D projection
+ * - Automatic scaling/positioning synchronization with WebGL camera
+ * - Proper z-indexing and depth culling maintained by drei
+ * - All markdown elements rendered as standard DOM within the Html context
  */
-function sanitizeContentForDisplay(content: string): string {
-  if (!content) return "";
 
-  try {
-    return DOMPurify.sanitize(content, {
-      USE_PROFILES: { html: true },
-      ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "span"],
-      ALLOWED_ATTR: ["class", "style"],
-      FORBID_TAGS: ["script", "iframe", "object", "embed", "link", "meta"],
-      FORBID_ATTR: ["onerror", "onclick", "onmouseover", "onfocus", "onload"],
-    });
-  } catch {
-    return "";
-  }
-}
+// Custom markdown component renderers matching glassmorphism aesthetic
+const markdownComponents: Components = {
+  h1: ({ children }: { children?: ReactNode }) => (
+    <h1 className="text-lg font-bold mb-3 text-slate-900 border-b border-white/20 pb-2">
+      {children}
+    </h1>
+  ),
+  h2: ({ children }: { children?: ReactNode }) => (
+    <h2 className="text-base font-bold mb-2 text-slate-800 border-b border-white/10 pb-1.5">
+      {children}
+    </h2>
+  ),
+  h3: ({ children }: { children?: ReactNode }) => (
+    <h3 className="text-sm font-semibold mb-2 text-slate-800">
+      {children}
+    </h3>
+  ),
+  h4: ({ children }: { children?: ReactNode }) => (
+    <h4 className="text-sm font-semibold mb-1.5 text-slate-800">
+      {children}
+    </h4>
+  ),
+  h5: ({ children }: { children?: ReactNode }) => (
+    <h5 className="text-xs font-semibold mb-1.5 text-slate-800">
+      {children}
+    </h5>
+  ),
+  h6: ({ children }: { children?: ReactNode }) => (
+    <h6 className="text-xs font-medium mb-1 text-slate-800">
+      {children}
+    </h6>
+  ),
+  p: ({ children }: { children?: ReactNode }) => (
+    <p className="mb-2 text-sm leading-relaxed text-slate-800">
+      {children}
+    </p>
+  ),
+  ul: ({ children }: { children?: ReactNode }) => (
+    <ul className="list-disc list-inside mb-2 ml-2 text-sm text-slate-800">
+      {children}
+    </ul>
+  ),
+  ol: ({ children }: { children?: ReactNode }) => (
+    <ol className="list-decimal list-inside mb-2 ml-2 text-sm text-slate-800">
+      {children}
+    </ol>
+  ),
+  li: ({ children }: { children?: ReactNode }) => (
+    <li className="mb-1">
+      {children}
+    </li>
+  ),
+  blockquote: ({ children }: { children?: ReactNode }) => (
+    <blockquote className="border-l-4 border-white/30 pl-3 py-1 mb-2 italic text-slate-700 bg-white/5 my-2 rounded-r">
+      {children}
+    </blockquote>
+  ),
+  code: ({ children, inline }: { children?: ReactNode; inline?: boolean }) => {
+    if (inline) {
+      return (
+        <code className="bg-slate-900/20 px-1.5 py-0.5 rounded text-xs font-mono text-slate-900 border border-white/10">
+          {children}
+        </code>
+      );
+    }
+    return (
+      <code className="block bg-slate-900/30 p-2 rounded-lg mb-2 text-xs font-mono text-slate-900 border border-white/15 overflow-x-auto">
+        {children}
+      </code>
+    );
+  },
+  pre: ({ children }: { children?: ReactNode }) => (
+    <pre className="bg-slate-900/30 p-2 rounded-lg mb-2 overflow-x-auto border border-white/15">
+      {children}
+    </pre>
+  ),
+  table: ({ children }: { children?: ReactNode }) => (
+    <div className="overflow-x-auto mb-2">
+      <table className="w-full text-xs border-collapse border border-white/20">
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ children }: { children?: ReactNode }) => (
+    <thead className="bg-white/15 border-b border-white/25">
+      {children}
+    </thead>
+  ),
+  tbody: ({ children }: { children?: ReactNode }) => (
+    <tbody>
+      {children}
+    </tbody>
+  ),
+  tr: ({ children }: { children?: ReactNode }) => (
+    <tr className="border-b border-white/15 hover:bg-white/10 transition-colors">
+      {children}
+    </tr>
+  ),
+  td: ({ children }: { children?: ReactNode }) => (
+    <td className="px-2 py-1 border-r border-white/15 last:border-r-0 text-slate-800">
+      {children}
+    </td>
+  ),
+  th: ({ children }: { children?: ReactNode }) => (
+    <th className="px-2 py-1 border-r border-white/15 last:border-r-0 font-semibold text-slate-900 text-left">
+      {children}
+    </th>
+  ),
+  strong: ({ children }: { children?: ReactNode }) => (
+    <strong className="font-bold text-slate-900">
+      {children}
+    </strong>
+  ),
+  em: ({ children }: { children?: ReactNode }) => (
+    <em className="italic text-slate-800">
+      {children}
+    </em>
+  ),
+  del: ({ children }: { children?: ReactNode }) => (
+    <del className="line-through text-slate-600">
+      {children}
+    </del>
+  ),
+  a: ({ children, href }: { children?: ReactNode; href?: string }) => (
+    <a
+      href={href}
+      className="text-blue-500 hover:text-blue-600 underline transition-colors"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {children}
+    </a>
+  ),
+  hr: () => (
+    <hr className="my-2 border-t border-white/20" />
+  ),
+};
 
 export function WebGLTextRenderer({
   content,
   position = [1, 1, -1],
   rotation = [0, 0, 0],
-  scale = 0.5,
+  scale = 0.2,
   className,
 }: WebGLTextRendererProps) {
-  const sanitized_content = useMemo(() => {
+  const isContentValid = useMemo(() => {
     const trimmed = (content ?? "").trim();
-    return trimmed ? sanitizeContentForDisplay(trimmed) : "";
+    return trimmed.length > 0;
   }, [content]);
 
-  if (!sanitized_content) return null;
+  if (!isContentValid) return null;
 
   return (
     <Html
@@ -85,10 +217,17 @@ export function WebGLTextRenderer({
           borderWidth: 1,
           borderStyle: "solid",
         }}
-        dangerouslySetInnerHTML={{ __html: sanitized_content }}
         aria-live="polite"
         aria-label="3D display content"
-      />
+      >
+        <ReactMarkdown
+          components={markdownComponents}
+          skipHtml={true}
+          disallowedElements={["script", "iframe", "object", "embed"]}
+        >
+          {content}
+        </ReactMarkdown>
+      </div>
     </Html>
   );
 }

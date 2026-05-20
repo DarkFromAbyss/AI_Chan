@@ -89,6 +89,10 @@ class ModelResponseSchema(BaseModel):
         default="",
         description="Detailed academic content with HTML5 formatting"
     )
+    text_content: str = Field(
+        default="",
+        description="Plain text content extracted from <text> tag (for future use)"
+    )
     voice_text: str = Field(
         default="",
         description="Natural Japanese text for TTS synthesis"
@@ -125,6 +129,7 @@ class ModelResponseSchema(BaseModel):
                 "session_id": "conv_12345",
                 "assistant_text": "High school (高校) is the secondary education stage...",
                 "html_content": "<p><b>Definition:</b> Grades 10-12 in Japanese education system</p>",
+                "text_content": "高校は日本の教育制度における中等教育段階です。",
                 "voice_text": "高校は日本の教育制度における中等教育段階です。",
                 "intent_classification": "search",
                 "sources": ["vocabulary_db:高校"],
@@ -187,6 +192,10 @@ class FormattedLLMResponseSchema(BaseModel):
         ...,
         description="HTML formatted content"
     )
+    text_content: str = Field(
+        ...,
+        description="Plain text content extracted from <text> tag"
+    )
     voice_text: str = Field(
         ...,
         description="Japanese text for TTS"
@@ -211,6 +220,7 @@ class FormattedLLMResponseSchema(BaseModel):
                 "success": True,
                 "assistant_text": "Here is the explanation...",
                 "html_content": "<p>Detailed content</p>",
+                "text_content": "高校は日本の教育制度における中等教育段階です。",
                 "voice_text": "説明を提供します。",
                 "intent_classification": "search",
                 "metadata": {

@@ -17,8 +17,9 @@ class FormattedResponse:
     """Standardized formatted response from LLM output."""
     
     success: bool
-    display_text: str
     html_content: str
+    text_content: str
+    display_text: str
     voice_text: str
     intent_classification: str
     raw_output: str
@@ -72,6 +73,7 @@ class OutputFormatter:
             "voice_text_length": len(voice_text),
             "display_text_length": len(extracted.display),
             "html_content_length": len(extracted.html),
+            "text_content_length": len(extracted.text),
         }
 
         logger.info(
@@ -82,8 +84,9 @@ class OutputFormatter:
 
         return FormattedResponse(
             success=True,
-            display_text=extracted.display,
             html_content=extracted.html,
+            text_content=extracted.text,
+            display_text=extracted.display,
             voice_text=voice_text,
             intent_classification=extracted.intent,
             raw_output=llm_output,
@@ -101,7 +104,7 @@ class OutputFormatter:
         Returns:
             Tuple of (is_valid, error_message)
         """
-        required_tags = ['html', 'display', 'voice', 'intent']
+        required_tags = ['html', 'text', 'display', 'voice', 'intent']
         
         is_valid = True
         error_msgs = []
@@ -135,6 +138,7 @@ class OutputFormatter:
             "display_preview": response.display_text[:50] + "...",
             "voice_chars": len(response.voice_text),
             "has_html": len(response.html_content) > 0,
+            "text_length": len(response.text_content),
             "error": response.error_details,
         }
 
@@ -156,8 +160,9 @@ class OutputFormatter:
         
         return FormattedResponse(
             success=False,
-            display_text="申し訳ありません。システムエラーが発生しました。",
             html_content="<p>System error occurred. Please try again.</p>",
+            text_content="申し訳ありません。システムエラーが発生しました。",
+            display_text="申し訳ありません。システムエラーが発生しました。",
             voice_text="エラーが発生しました。",
             intent_classification="other",
             raw_output=raw_output,

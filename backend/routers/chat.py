@@ -107,6 +107,7 @@ async def post_chat_message(request: ChatMessageRequest, req: Request) -> ChatMe
         
         display_text = llm_output.assistant_text
         voice_text = llm_output.voice_text
+        text_content = llm_output.text_content  # For future use if needed
         
         if not display_text:
             logger.warning("Empty display text in agent response")
@@ -116,6 +117,7 @@ async def post_chat_message(request: ChatMessageRequest, req: Request) -> ChatMe
         logger.debug(
             f"Using extracted response | Display: {len(display_text)} chars | "
             f"Voice: {len(voice_text)} chars"
+            f"Text content: {len(text_content)} chars"
         )
 
         # ========== STEP 5: Format as ChatMessageResponse ==========
@@ -123,7 +125,7 @@ async def post_chat_message(request: ChatMessageRequest, req: Request) -> ChatMe
             status="success",
             display=display_text,  # Display text for UI
             voice=voice_text,  # Japanese text for TTS synthesis
-            display2d= voice_text,  # For 3D WebGL rendering, we can use the same text or a formatted version
+            display2d=display_text,  # For 3D WebGL rendering, we can use the same text or a formatted version
             message_id=message_id,
             timestamp=current_timestamp
         )
