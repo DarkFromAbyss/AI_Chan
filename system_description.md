@@ -1,7 +1,7 @@
 # AI NARAGI - System Description Registry
 
-**Last Updated:** May 20, 2026 (VRM Breathing Animation - Rotation & Update Order Fixes)  
-**Version:** 1.5.3 (Breathing Motion Visibility & Performance Fix)
+**Last Updated:** May 21, 2026 (SenseiCerebellum Refactoring - VRM Motion/Reflex Processing with Strict JSON Output)  
+**Version:** 1.6.1 (Motion Analysis Engine with brain/1.5B/rules.md Compliance)
 
 ---
 
@@ -387,6 +387,160 @@ This document serves as the **single source of truth** for all system components
 2. **NEW:** Include tts.router (@ /api/tts)
 
 **Error Handling:** Engine startup failures logged as WARNING, TTS endpoint still registered (returns error responses)
+
+---
+
+### Component 9: SenseiCerebellum (llm_core/cerebellum.py) - REFACTORED
+
+**Name:** `SenseiCerebellum` class + `MotionResponse`, `BodyState` dataclasses
+
+**Internal Dependencies:**
+- `json` (strict JSON parsing and serialization)
+- `re` (regex for extracting JSON from malformed output)
+- `transformers.AutoTokenizer, AutoModelForCausalLM, pipeline` (local model loading)
+- `torch` (GPU/CPU device management)
+- `langgraph.graph.StateGraph, START, END` (lightweight execution pipeline)
+- `langchain_core.messages.HumanMessage` (message initialization)
+- `llm_core.utils.logger.get_logger` (structured logging)
+- `llm_core.utils.config_manager.ConfigLoader` (config resolution)
+- `llm_core.agents.state_definitions.AgentState` (state contract)
+
+**Purpose:** VRM Avatar Motion & Reflex Processing Engine. Analyzes conversational text inputs and translates emotional/contextual undertones into mathematical state vectors for 3D animation. Enforces strict JSON-only output with no markdown, conversational text, or filler per brain/1.5B/rules.md.
+
+**Process Flow:**
+
+**MotionResponse & BodyState Dataclasses:**
+- `BodyState`: Holds four animation parameters (forward_lean, sway_amplitude, sway_frequency, shoulder_tension)
+  - `to_dict()`: Rounds to 2 decimal places, returns dict
+  - `clamp_values()`: Static method enforcing strict range constraints (e.g., forward_lean 0.00-0.25)
+- `MotionResponse`: Container for emotion string + BodyState
+  - `to_json_string()`: Returns minified JSON with NO whitespace (separators=(",", ":"))
+
+**Initialization (`__init__`):**
+1. Validate parameters: max_tokens (1-512, reduced for JSON), temperature (0.0-2.0), top_p (0.0-1.0)
+2. Detect device (CUDA if available, else CPU)
+3. Load config via ConfigLoader
+4. Resolve model path from `models/Qwen2.5-1.5B-Instruct`
+5. Load tokenizer with local_files_only=True
+6. Load model with torch.float16 on CUDA, float32 on CPU
+7. Set model to eval mode
+8. Create transformers inference pipeline
+9. Call `_build_graph()` to compile execution graph
+10. Log initialization with device and parameters
+
+**Graph Building (`_build_graph`):**
+1. Create StateGraph with AgentState
+2. Add "motion" node (references `_motion_node`)
+3. Connect START → motion → END
+4. Compile graph
+5. Return compiled graph
+
+**Motion Analysis (`_motion_node`):**
+1. Extract latest user message from state["messages"]
+2. Format prompt with strict JSON output enforcement via `_format_motion_prompt`
+3. Run pipeline inference with conservative temperature (0.5 default for deterministic output)
+4. Extract generated text and strip prompt prefix
+5. Parse JSON output with fallback:
+   - Try: `json.loads(json_output)`
+   - Catch JSONDecodeError: Call `_extract_json_from_malformed()` to remove markdown/filler
+6. Validate emotion and clamp body_state ranges via `_validate_motion_response()`
+7. Convert to minified JSON string via `motion_response.to_json_string()`
+8. Store result in state["_motion_result"] (avoids LangGraph message append issues)
+9. Return updated state
+10. On exception: catch CUDA OOM, RuntimeError, generic → call `_error_response()`
+
+**Public API (`generate_response(user_query: str) -> str`):**
+1. Validate input: Must be string type, non-empty after strip
+2. Initialize AgentState with HumanMessage(user_query)
+3. Execute compiled graph via `self.graph.invoke(initial_state)`
+4. Extract "_motion_result" from final_state
+5. Return minified JSON string (e.g., `{"emotion":"happy","body_state":{...}}`)
+6. On error: Return fallback JSON via `_fallback_motion_json()`
+
+**Prompt Formatting (`_format_motion_prompt(user_input)`):**
+- Builds comprehensive system instruction emphasizing:
+  - "Output ONLY minified JSON"
+  - "NO markdown code blocks"
+  - "NO conversational text, explanations, or filler"
+  - Lists valid emotions: neutral, happy, sad, angry, surprised, relaxed
+  - Specifies body_state parameter ranges per brain/1.5B/rules.md
+- Uses Qwen chat template: `<|im_start|>system\n{instruction}<|im_end|>\n<|im_start|>user\n{input}<|im_end|>\n<|im_start|>assistant\n`
+
+**Malformed JSON Recovery (`_extract_json_from_malformed(text)`):**
+1. Remove markdown code blocks: ``` json ... ```
+2. Use regex `\{.*\}` to find JSON object in text
+3. Attempt `json.loads()` on extracted match
+4. If all fails, return `_default_motion_data()`
+
+**Response Validation (`_validate_motion_response(data)`):**
+1. Extract emotion string, validate against VALID_EMOTIONS set
+2. Default to "neutral" if invalid
+3. Extract body_state dict, validate it's a dict type
+4. Clamp all values using `BodyState.clamp_values()`
+5. Return MotionResponse with validated emotion + clamped body_state
+
+**Error Recovery (`_error_response(state, error_type)`):**
+1. Map error_type to fallback emotion (e.g., "memory" → "relaxed", else "neutral")
+2. Generate fallback JSON via `_fallback_motion_json(fallback_emotion)`
+3. Store in state["_motion_result"]
+4. Return updated state (prevents cascade failures)
+
+**Fallback Generation (`_fallback_motion_json(emotion)`):**
+- Creates MotionResponse with safe defaults:
+  - emotion: neutral (or specified)
+  - body_state: forward_lean=0.05, sway_amplitude=0.02, sway_frequency=0.75, shoulder_tension=0.05
+- Returns minified JSON string
+
+**Configuration Parameters:**
+- `model_name`: "Qwen2.5-1.5B-Instruct" (default)
+- `max_tokens`: 256 (default, max 512, reduced for JSON)
+- `temperature`: 0.5 (default, lower for deterministic JSON output)
+- `top_p`: 0.95 (nucleus sampling)
+- `device`: Auto-detected (cuda/cpu)
+- `VALID_EMOTIONS`: {"neutral", "happy", "sad", "angry", "surprised", "relaxed"}
+
+**Logging:**
+- DEBUG: Graph compilation, JSON parsing, parameter validation, fallback activation
+- INFO: Initialization, inference success, response generation, extraction stats
+- WARNING: Invalid emotion, malformed JSON, empty input, memory constraints
+- ERROR: Model not found, CUDA OOM, parsing failures (with context)
+
+**Output Format (STRICT):**
+- Minified JSON: `{"emotion":"neutral","body_state":{"forward_lean":0.05,...}}`
+- NO markdown code blocks (no ```json ... ```)
+- NO trailing text, explanations, or conversational filler
+- NO whitespace beyond JSON structure
+- All body_state floats: 2 decimal places, ranges enforced
+
+**Error Handling:**
+- **ValueError:** Invalid user_query type or empty string → raise before inference
+- **FileNotFoundError:** Model not in models/ directory → raise during __init__
+- **torch.cuda.OutOfMemoryError:** Insufficient VRAM → return error state with neutral emotion
+- **RuntimeError:** Model/tokenizer failures → return error state
+- **json.JSONDecodeError:** Malformed output → attempt regex extraction or use defaults
+- **Generic Exception:** Catch-all → error state + full traceback in logs
+
+**Compliance:**
+✅ **KISS:** Minimal, focused JSON output generator (no chat features)
+✅ **Write for Humans:** Clear method names, comprehensive docstrings
+✅ **DRY:** Reused `_fallback_motion_json()`, `_validate_motion_response()` across error paths
+✅ **YAGNI:** No unused features; only motion analysis pipeline
+✅ **SoC:** Model loading isolated, JSON enforcement isolated, validation isolated
+✅ **Statelessness:** No instance mutations; state managed via LangGraph
+✅ **API-First:** Single input (user_query: str), single output (minified JSON string)
+✅ **Strict Typing:** Full type hints on all methods, dataclasses for data structures
+✅ **No Print:** All output via logging with appropriate levels
+✅ **No Hard-coding:** Config via yaml, parameters via __init__
+✅ **Functions ≤50 lines:** All methods ≤50 lines per rules.md
+
+**Behavioral Alignment with brain/1.5B/rules.md:**
+✅ Output: Exactly ONE minified JSON object with emotion + body_state
+✅ NO markdown wrapping (no ```json ... ```)
+✅ NO conversational filler or explanations
+✅ Emotion: One of six valid values (enforced in validation)
+✅ Body parameters: All within specified ranges (enforced via clamping)
+✅ Input: Natural language query string
+✅ Output: Raw JSON bracket-to-bracket only
 
 ---
 
