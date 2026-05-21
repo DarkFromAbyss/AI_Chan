@@ -89,28 +89,21 @@ export function VrmModel({ url, onError, onLoad }: VrmModelProps) {
   useFrame((state, delta) => {
     if (!vrm) return;
 
-    // Update VRM model (applies bone transformations)
-    vrm.update(delta);
+    // STEP 1: Calculate all animation states (blinking, breathing)
+    // These mutations are applied to VRM bones and expressions in memory
+    blendShapeControllerRef.current?.update(Date.now());
+    blendShapeControllerRef.current?.updateBreathing(state.clock.getElapsedTime());
 
-    // Update blinking animation
-    const currentTime = Date.now() / 1000;
-    blendShapeControllerRef.current?.update(currentTime);
-
-    // Update body animations (idle, walk, etc)
+    // STEP 2: Update body animations (skeletal mixer animations)
+    // This applies idle, walk, and other animation clip transformations
     if (mixerRef.current) {
       mixerRef.current.update(delta);
     }
 
-    // Apply subtle idle breathing for natural movement
-    const time = state.clock.getElapsedTime();
-    const breathingInfluence = Math.sin(time * 1.2) * 0.01;
-
-    if (vrm.humanoid) {
-      const chest = vrm.humanoid.getNormalizedBoneNode("chest");
-      if (chest) {
-        chest.scale.y = 1 + breathingInfluence;
-      }
-    }
+    // STEP 3: Propagate all accumulated transformations to the Three.js scene graph
+    // This MUST be called LAST so that all mutations (expressions + bone rotations + mixer)
+    // are applied to the GPU before rendering. Calling this earlier breaks the update chain.
+    vrm.update(delta);
   });
 
   if (error || !vrm) return null;

@@ -190,7 +190,7 @@ def main() -> None:
     try:
         logger.info("Validating download configuration")
         model_directory = download_hf_model(config)
-        update_config_yaml(config.repo_id, model_directory)
+        # update_config_yaml(config.repo_id, model_directory)
         print(f"\n✓ Model download completed successfully.")
         print(f"  Storage location: {model_directory}\n")
         display_directory_tree(model_directory)
