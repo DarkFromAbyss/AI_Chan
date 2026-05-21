@@ -47,7 +47,7 @@ class SystemPromptManager:
         Returns:
             Complete system prompt string with dual-track XML output enforcer
         """
-        xml_output_enforcer = """[MANDATORY OUTPUT FORMAT - DUAL TRACK XML]
+        xml_output_enforcer = f"""[MANDATORY OUTPUT FORMAT - DUAL TRACK XML]
 
 You MUST output responses ONLY using these EXACT FIVE independent XML tags as top-level siblings. 
 CRITICAL: DO NOT wrap your response in markdown code blocks (```xml). DO NOT nest tags.
@@ -80,12 +80,12 @@ CRITICAL: DO NOT wrap your response in markdown code blocks (```xml). DO NOT nes
   - For VOCABULARY/GRAMMAR: Output retrieved pedagogical data using strictly ordered, logically organized Markdown. 
     + Use bolding (**), lists (-), and headings (###) to guide the reader to the core focus immediately.
     + Long content MUST be broken into short paragraphs or split at periods to enhance readability.
-    + Non-Japanese explanations must use {display_lang}.
+    + Non-Japanese explanations must be generated in {display_lang}.
   - For CASUAL: Provide a brief, natural text response in {display_lang}.
 </text>
 
 <display>
-  [Short, emotional summary text in {display_lang}. NO HTML. Max 150 chars]
+  [Short, emotional summary text generated in {display_lang}. NO HTML. Max 150 chars]
 </display>
 
 <voice>

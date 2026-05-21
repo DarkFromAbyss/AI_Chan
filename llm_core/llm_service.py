@@ -198,11 +198,11 @@ class SenseiAgent:
         session_id = message_input.session_id
         user_text = message_input.user_text
         user_id = message_input.user_id
-        language = message_input.language
+        language = message_input.language or "en"
         
         logger.info(
-            "Generating response | Session: %s | User: %s | Query: %s...",
-            session_id, user_id, user_text[:100]
+            "Generating response | Session: %s | User: %s | Query: %s | Language: %s",
+            session_id, user_id, user_text[:100], language
         )
         
         try:
@@ -237,6 +237,7 @@ class SenseiAgent:
             import time as time_module
             recent_time = time_module.strftime("%Y-%m-%d %H:%M:%S")
             
+            logger.info("Cache miss for session %s , %s | Executing agent...", session_id, language)
             inputs = {
                 "messages": [HumanMessage(content=user_text)],
                 "display_lang": language,

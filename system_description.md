@@ -773,8 +773,9 @@ User Types: "高校とは何ですか？"
     ├─ Convert to MessageInputSchema
     ├─ Call agent.generate_response(llm_input)
     └─ Returns ModelResponseSchema with:
-       ├─ display_text: "High school (高校) is..."
        ├─ html_content: "<p>Definition: ...</p>"
+       ├─ text_cotent: "High school (高校) is..."
+       ├─ display_text: "High school (高校) is..."
        ├─ voice_text: "高校は日本の教育制度における..."
        └─ intent: "search"
     ↓
